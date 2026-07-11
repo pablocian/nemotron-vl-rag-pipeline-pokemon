@@ -1,0 +1,16 @@
+[project]
+name = "nemotron-vl-rag-pipeline"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "datasets>=5.0.0",
+    "torch>=2.13.0",
+    "transformers>=5.13.1",
+]
+
+[project.optional-dependencies]
+jupyter = [
+    "jupyter>=1.1.1",
+]
