@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict
 import torch
 from PIL import Image
 from transformers import Qwen3VLForConditionalGeneration
@@ -25,7 +25,7 @@ class Pipeline:
         self.parser = parser
         self.generator = generator
     
-    def run(self, query: str, query_image: Image.Image | None = None, docs_top_k: int = 3) -> tuple[str, list[Image.Image]]:
+    def run(self, query: str, query_image: Image.Image | None = None, docs_top_k: int = 3) -> tuple[str, list[Dict[str, Any]]]:
         """
         Multimodal RAG pipeline:
 
@@ -37,11 +37,15 @@ class Pipeline:
             docs_top_k(int): The number of documents to retrieve. Defaults to 3.
 
         Returns:
-            tuple[str, list[PIL.Image.Image]]: The response and the top k retrieved document images.
+            tuple[str, list[Dict[str, Any]]]: The response and the top k retrieved images and scores.
         """
-        retrieved_docs = self.retriever._run(query, query_image, docs_top_k)
+        retrieved_docs, scores = self.retriever._run(query, query_image, docs_top_k)
         prompt, doc_images = self.parser._run(query, retrieved_docs)
         response = self.generator._run(prompt, query_image)
+        
+        # merge retrieved images and scores
+        doc_images = [{"image": im, "score": score} for im, score in zip(doc_images, scores)]
+        
         return response, doc_images
 
 
@@ -66,7 +70,7 @@ class Retriever:
         top_k_scores = cos_sim_flat[top_k_idx]
         return top_k_idx, top_k_scores
     
-    def _run(self, query: str, query_image: Image.Image | None, top_k: int) -> Dataset:
+    def _run(self, query: str, query_image: Image.Image | None, top_k: int) -> tuple[Dataset, list[float]]:
         with torch.inference_mode():
             if query_image is None:
                 embed_query = self.embed_model.encode_documents(texts=[query])
@@ -79,7 +83,7 @@ class Retriever:
             top_k,
         )
 
-        return self.ds.select(indices)
+        return self.ds.select(indices), scores.tolist()
 
 
 class Parser:

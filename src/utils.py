@@ -36,8 +36,7 @@ def load_embed_model(modality : Literal["image_text", "image", "text"] = "image_
     return embed_model
 
 
-def load_embeddings() -> Dict[str, torch.Tensor]:
-    embeddings_path = Path.cwd().parent / "image_text_embeddings.safetensors"
+def load_embeddings(embeddings_path: str | Path) -> Dict[str, torch.Tensor]:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return load_file(embeddings_path, device=device.type)
 

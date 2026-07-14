@@ -1,0 +1,146 @@
+import os
+import logging
+import gradio as gr
+import spaces
+from pathlib import Path
+from datasets import load_dataset
+
+from src.pipeline import (
+    Pipeline,
+    Retriever,
+    Parser,
+    Generator,
+    POKEMON_CHAT_TEMPLATE,
+)
+from src.utils import (
+    load_embed_model,
+    load_embeddings,
+    load_gen_model,
+)
+
+logger = logging.getLogger(__name__)
+log_handler = logging.StreamHandler()
+log_formatter = logging.Formatter('%(levelname)s - %(message)s')
+log_handler.setFormatter(log_formatter)
+logger.addHandler(log_handler)
+logger.setLevel(logging.INFO)
+
+CHECK_DEVICES = True
+PROJECT_ROOT = Path(os.path.dirname(os.path.realpath(__file__)))
+
+TITLE_AND_DESCRIIPTION = """# 👁️📑 Multimodal RAG over Pokémon documents with Nemotron Embed VL
+
+Chat with a [Pokémon database](https://huggingface.co/datasets/cian-ps/pokedb-vl-1k).
+Input text and optionally an image and get a contextual response.
+Optionally, specify the number of documents to retrieve with the Top k documents slider.
+
+- **Embedding model used:** [nvidia/llama-nemotron-embed-vl-1b-v2](https://huggingface.co/nvidia/llama-nemotron-embed-vl-1b-v2)
+- **Generator model used:** [Qwen/Qwen3-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct)
+"""
+
+
+logger.info("Loading data & models...")
+
+ds = load_dataset("cian-ps/pokedb-vl-1k", split="train")
+
+embeddings_path = PROJECT_ROOT / "image_text_embeddings.safetensors"
+if not embeddings_path.exists():
+    raise FileNotFoundError(f"Embeddings file not found at {embeddings_path}")
+
+embeddings = load_embeddings(embeddings_path)
+embed_model = load_embed_model()
+gen_model, gen_processor = load_gen_model()
+
+rag_pipeline = Pipeline(
+    retriever=Retriever(embed_model, ds, embeddings["image_text_embeddings"]),
+    parser=Parser(POKEMON_CHAT_TEMPLATE),
+    generator=Generator(gen_model, gen_processor),
+)
+
+
+@spaces.GPU
+def check_devices():
+    logger.info(f"Embedding model on device: {rag_pipeline.retriever.embed_model.device}")
+    logger.info(f"Generator model on device: {rag_pipeline.generator.gen_model.device}")
+
+
+if CHECK_DEVICES:
+    check_devices()
+
+
+@spaces.GPU
+def on_query(query_text, query_image, docs_top_k=3):
+    response, doc_images = rag_pipeline.run(query_text, query_image, docs_top_k)
+    output_image_gallery = [
+        (im["image"], f"Score: {im['score']:.5f}") for im in doc_images
+    ]
+    return output_image_gallery, response
+
+
+with gr.Blocks(title="Nemotron VL RAG - Pokémon") as app:
+    gr.Markdown(TITLE_AND_DESCRIIPTION)
+    
+    with gr.Row():
+        with gr.Column(scale=1):
+            gr.Markdown("### Query Input")
+
+            query_text = gr.Textbox(
+                label="Query Text",
+                placeholder="e.g. 'How many evolutions does Eevee have?'",
+                lines=2,
+            )
+
+            query_image = gr.Image(
+                label="Query Image (optional)",
+                type="pil",
+                height=200,
+            )
+
+            top_k_slider = gr.Slider(
+                minimum=1,
+                maximum=10,
+                step=1,
+                value=3,
+                label="Top k documents",
+            )
+
+            enter_btn = gr.Button("Enter", variant="primary", size="lg")
+        
+        with gr.Column(scale=2):
+            gr.Markdown("### Response:")
+
+            response = gr.Markdown(
+                "Hi! I'm an AI assistant designed to assist with questions related to Pokémon. How can I help you today?",
+                label="Generated Response",
+            )
+
+            gallery_output = gr.Gallery(
+                label="Retrieved Documents",
+                columns=3,
+                height="auto",
+                object_fit="cover",
+                show_label=True,
+            )
+
+    gr.Markdown("### Example Queries")
+
+    gr.Examples(
+        examples=[
+            ["How many evolutions does Eevee have?"],
+            ["Lucario is what dual type of Pokemon?"],
+            ["What Pokedex number is Pikachu?"],
+        ],
+        inputs=[query_text],
+        label="Example Queries",
+    )
+
+    enter_btn.click(
+        fn=on_query,
+        inputs=[query_text, query_image, top_k_slider],
+        outputs=[gallery_output, response],
+    )
+
+
+if __name__ == "__main__":
+    logger.info("Launching app...")
+    app.launch()
