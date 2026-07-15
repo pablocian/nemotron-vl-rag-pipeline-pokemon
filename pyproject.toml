@@ -1,7 +1,7 @@
 [project]
-name = "nemotron-vl-rag-pipeline"
+name = "nemotron-vl-rag-pipeline-pokemon"
 version = "0.1.0"
-description = "Add your description here"
+description = "Multimodal RAG over Pokémon documents"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
