@@ -24,6 +24,11 @@ class Pipeline:
         self.retriever = retriever
         self.parser = parser
         self.generator = generator
+
+    def to(self, device: str | torch.device) -> Pipeline:
+        self.retriever.to(device)
+        self.generator.to(device)
+        return self
     
     def run(self, query: str, query_image: Image.Image | None = None, docs_top_k: int = 3) -> tuple[str, list[Dict[str, Any]]]:
         """
@@ -53,7 +58,12 @@ class Retriever:
     def __init__(self, embed_model: Any, ds: Dataset, ds_embeddings: torch.Tensor) -> None:
         self.embed_model = embed_model
         self.ds = ds
-        self.ds_embeddings = ds_embeddings.to(embed_model.device)
+        self.ds_embeddings = ds_embeddings
+
+    def to(self, device: str | torch.device) -> Retriever:
+        self.embed_model.to(device)
+        self.ds_embeddings = self.ds_embeddings.to(device)
+        return self
     
     def _l2_normalize(self, x: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
         return x / (x.norm(p=2, dim=-1, keepdim=True) + eps)
@@ -111,6 +121,10 @@ class Generator:
         self.gen_processor = gen_processor
         self.temperature = temperature
         self.max_new_tokens = max_new_tokens
+
+    def to(self, device: str | torch.device) -> Generator:
+        self.gen_model.to(device)
+        return self
     
     def _run(self, prompt: str, query_image: Image.Image | None) -> str:
         messages = [

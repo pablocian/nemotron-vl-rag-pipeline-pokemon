@@ -23,7 +23,6 @@ def load_embed_model(modality : Literal["image_text", "image", "text"] = "image_
         dtype=torch.bfloat16,
         trust_remote_code=True,
         attn_implementation="sdpa",
-        device_map="auto",
     ).eval()
 
     # set max number of tokens
@@ -37,15 +36,13 @@ def load_embed_model(modality : Literal["image_text", "image", "text"] = "image_
 
 
 def load_embeddings(embeddings_path: str | Path) -> Dict[str, torch.Tensor]:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return load_file(embeddings_path, device=device.type)
+    return load_file(embeddings_path, device="cpu")
 
 
 def load_gen_model() -> tuple[Qwen3VLForConditionalGeneration, Any]:
     qwen_model = Qwen3VLForConditionalGeneration.from_pretrained(
         "Qwen/Qwen3-VL-2B-Instruct",
         dtype="auto",
-        device_map="auto",
     )
 
     qwen_processor = AutoProcessor.from_pretrained("Qwen/Qwen3-VL-2B-Instruct")

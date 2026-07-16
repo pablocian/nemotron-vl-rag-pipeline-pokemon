@@ -2,6 +2,7 @@ import os
 import logging
 import gradio as gr
 import spaces
+import torch
 from pathlib import Path
 from datasets import load_dataset
 
@@ -25,7 +26,6 @@ log_handler.setFormatter(log_formatter)
 logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
 
-CHECK_DEVICES = True
 PROJECT_ROOT = Path(os.path.dirname(os.path.realpath(__file__)))
 
 TITLE_AND_DESCRIIPTION = """# 👁️📑 Multimodal RAG over Pokémon documents with Nemotron Embed VL
@@ -59,22 +59,17 @@ rag_pipeline = Pipeline(
 
 
 @spaces.GPU
-def check_devices():
-    logger.info(f"Embedding model on device: {rag_pipeline.retriever.embed_model.device}")
-    logger.info(f"Generator model on device: {rag_pipeline.generator.gen_model.device}")
-
-
-if CHECK_DEVICES:
-    check_devices()
-
-
-@spaces.GPU
 def on_query(query_text, query_image, docs_top_k=3):
-    response, doc_images = rag_pipeline.run(query_text, query_image, docs_top_k)
-    output_image_gallery = [
-        (im["image"], f"Score: {im['score']:.5f}") for im in doc_images
-    ]
-    return output_image_gallery, response
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    rag_pipeline.to(device)
+    try:
+        response, doc_images = rag_pipeline.run(query_text, query_image, docs_top_k)
+        output_image_gallery = [
+            (im["image"], f"Score: {im['score']:.5f}") for im in doc_images
+        ]
+        return output_image_gallery, response
+    finally:
+        rag_pipeline.to("cpu")
 
 
 with gr.Blocks(title="Nemotron VL RAG - Pokémon") as app:
