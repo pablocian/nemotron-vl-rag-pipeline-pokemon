@@ -2003,7 +2003,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nemotron-vl-rag-pipeline"
+name = "nemotron-vl-rag-pipeline-pokemon"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

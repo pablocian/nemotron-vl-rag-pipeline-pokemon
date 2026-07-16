@@ -1,3 +1,13 @@
+---
+title: nemotron-vl-rag-pipeline-pokemon
+emoji: 👁️📑
+colorFrom: gray
+colorTo: gray
+sdk: gradio
+app_file: app.py
+pinned: false
+---
+
 # 👁️📑 Multimodal RAG over Pokémon documents with Nemotron Embed VL
 
 This multimodal (vision & language) RAG (Retrieval-augmented generation) pipeline can use text and images to retrieve relevant chunks of information from a knowledge base. Those chunks are then used to augment the input to a VLM (vision-language model) that in conclusion can generate a very context-aware response.
