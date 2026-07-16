@@ -21,8 +21,8 @@ At indexing time, documents from the knowledge base are encoded using an embeddi
 
 ```mermaid
 flowchart LR
-    Docs[Documents<br/>(images + markdown)]
-    Embedmodel[Embedding Model<br/>(Nemotron Embed VL)]
+    Docs([Documents])
+    Embedmodel[Embedding Model]
     Indexing[Indexing]
     VS[(Vector Store)]
 
