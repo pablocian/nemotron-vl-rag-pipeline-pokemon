@@ -26,7 +26,7 @@ logger.setLevel(logging.INFO)
 
 PROJECT_ROOT = Path(os.path.dirname(os.path.realpath(__file__)))
 
-TITLE_AND_DESCRIIPTION = """# 👁️📑 Multimodal RAG over Pokémon documents with Nemotron Embed VL
+TITLE_AND_DESCRIIPTION = """# ⚡🔴⚈ .̫ ⚈🔴 Multimodal RAG over Pokémon documents
 
 Chat with a [Pokémon database](https://huggingface.co/datasets/cian-ps/pokedb-vl-1k).
 Input text and optionally an image and get a contextual response.

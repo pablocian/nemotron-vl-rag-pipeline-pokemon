@@ -1,6 +1,6 @@
 ---
 title: nemotron-vl-rag-pipeline-pokemon
-emoji: 👁️📑
+emoji: ⚡
 colorFrom: gray
 colorTo: gray
 sdk: gradio
@@ -10,7 +10,7 @@ pinned: false
 
 # 👁️📑 Multimodal RAG over Pokémon documents with Nemotron Embed VL
 
-This multimodal (vision & language) RAG (Retrieval-augmented generation) pipeline can use text and images to retrieve relevant chunks of information from a knowledge base. Those chunks are then used to augment the input to a VLM (vision-language model) that in conclusion can generate a very context-aware response.
+This multimodal (vision & language) RAG (Retrieval-augmented generation) pipeline can use text and images to retrieve relevant chunks of information from a knowledge base. Those chunks are then used to augment the input to a VLM (vision-language model) that in conclusion can generate a context-aware response.
 
 In this demo project a toy dataset is being used. However, a system like this could easily be used with business documents, technical manuals, etc. and solve real-world problems.
 
@@ -22,10 +22,10 @@ In this demo project a toy dataset is being used. However, a system like this co
 ## Architecture
 
 Definitions:
-- query: user input in form of text, or text + an image, used for comparison to the documents as well as prompting the VLM
-- document: a document-like image + text pair holding one chunk of information. In this case, it's one row from the dataset, containing an image and markdown text both generated from a single page pdf document, holding information about one Pokémon.
-- knowledge base: the dataset
-- vector store: in this case, it's the dataset paired with a tensor that holds embedding vectors for each row of the dataset
+- **query**: user input in form of text, or text + an image, used for comparison to the documents as well as prompting the VLM
+- **document**: a document-like image + text pair holding one chunk of information. In this case, it's one row from the dataset, containing an image and markdown text both generated from a single page pdf document, holding information about one Pokémon.
+- **knowledge base**: the dataset
+- **vector store**: in this case, it's simply one tensor of embedding vectors for all samples of the dataset
 
 At indexing time, documents from the knowledge base are encoded using an embedding model, which creates vector representations of the input. Those embeddings are then stored for later use.
 
@@ -38,32 +38,43 @@ flowchart LR
 
     Docs --> Indexing
     Embedmodel --> Indexing
-    Indexing -->|"Documents + text-image embeddings"| VS
+    Indexing -->|"Document text-image embeddings"| VS
 ```
 
-At runtime, the user can query the system with a text or image. The query is encoded using the same embedding model and then compared to the embeddings in the vector store to retrieve the most relevant documents. The document markdown augments the prompt to the VLM. In the demo, the retrieved document images are also returned to the user. This step is optional and gives the user the chance to see which information the VLM gets.
+At runtime, the user can query the system with text, or text plus an image. The pipeline first rewrites the query into several alternative formulations, then retrieves documents with a hybrid of semantic (vector) and lexical (keyword) search. Those ranked lists are merged with reciprocal rank fusion into a single top-k set of documents, which is passed to the VLM together with the query to produce a context-aware response.
+
+**Query rewriting.** Unclear or conversational user questions can miss relevant documents if encoded as-is. The VLM therefore rephrases the original query into three variations: one that cleans up the same meaning, one that asks a useful subquestion, and one that generalizes toward the underlying principle. Encoding and searching with these diversified views of the same question increases the chance that vector search surfaces useful candidates.
+
+**Hybrid retrieval.** Semantic search embeds the rewritten queries (and optional query image) with the same embedding model used at indexing time, then ranks documents by cosine similarity against the vector store. Additionally, a BM25 keyword search runs over the document text with the primary rewritten query. Lexical search can surface exact matches—names, numbers, rare terms—that dense embeddings alone might underrank or miss. Combining both is hybrid retrieval.
+
+**Reciprocal rank fusion (RRF).** Each search path produces its own ranking. RRF merges them without needing calibrated raw scores: a document scores highly if it appears near the top of one or more lists. For document $d$ over rankings $(r_1, \ldots, r_n)$:
+
+$$
+\operatorname{RRF}(d) = \sum_{i=1}^{n} \frac{1}{k + \operatorname{rank}_i(d)}
+$$
+
+where $\operatorname{rank}_i(d)$ is the 1-based position of $d$ in ranking $i$, and $k$ is a smoothing constant (here $k = 60$, a common default). The fused scores are sorted descending to yield the final retrieval order.
 
 ```mermaid
 flowchart TD
-    Docs([Documents])
-    Indexing[Indexing]
     User([User])
+    Rewriter[Query Rewriter]
+    SemanticSearch[Semantic Search]
     VS[(Vector Store)]
+    BM25Search[BM25 Search]
+    Fusion[Rank Fusion]
     Embedmodel[Embedding Model]
-    Retriever[Retriever]
-    Template[RAG Template]
     VLM[Vision-Language Model]
 
-    Docs --> Indexing
-    Embedmodel --> Indexing
-    Indexing --> VS
-    Embedmodel --> Retriever
-    VS -->|"Documents + text-image embeddings"| Retriever
-    User -->|"1. Query text (+ image)"| Retriever
-    Retriever -->|"2. Relevant documents"| Template
-    Template -->|"3. Prompt (Query text + document markdown) (+ image)"| VLM
-    Template -->|"4. Document images"| User
-    VLM -->|"4. Text answer to the user's query"| User
+    User -->|"1. Query"| Rewriter
+    Rewriter -->|"Text + Image"| SemanticSearch
+    Rewriter -->|"Text only"| BM25Search
+    Embedmodel --> SemanticSearch
+    VS -->|"Document embeddings"| SemanticSearch
+    BM25Search --> Fusion
+    SemanticSearch --> Fusion
+    Fusion -->|"2. Query + top k documents"| VLM
+    VLM -->|"3. Response"| User
 ```
 
 ## Dataset
@@ -80,6 +91,6 @@ More information at: [nvidia/llama-nemotron-embed-vl-1b-v2](https://huggingface.
 
 ## Qwen3 VL 2B Instruct
 
-This vision-language model is good balance between size and performance. With 2 billion parameters, it's on the smaller side, but still very capable of handling complex tasks.
+This vision-language model is used for the generative aspects in the pipeline. As the name suggests, it can handle vision and language inputs and is only 2 billion parameters in size.
 
 More information at: [Qwen/Qwen3-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct)
