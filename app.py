@@ -9,9 +9,7 @@ from datasets import load_dataset
 from src.pipeline import (
     Pipeline,
     Retriever,
-    Parser,
     Generator,
-    POKEMON_CHAT_TEMPLATE,
 )
 from src.utils import (
     load_embed_model,
@@ -32,10 +30,9 @@ TITLE_AND_DESCRIIPTION = """# 👁️📑 Multimodal RAG over Pokémon documents
 
 Chat with a [Pokémon database](https://huggingface.co/datasets/cian-ps/pokedb-vl-1k).
 Input text and optionally an image and get a contextual response.
-Optionally, specify the number of documents to retrieve with the Top k documents slider.
 
 - **Embedding model used:** [nvidia/llama-nemotron-embed-vl-1b-v2](https://huggingface.co/nvidia/llama-nemotron-embed-vl-1b-v2)
-- **Generator model used:** [Qwen/Qwen3-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct)
+- **Generation model used:** [Qwen/Qwen3-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct)
 """
 
 
@@ -53,21 +50,17 @@ gen_model, gen_processor = load_gen_model()
 
 rag_pipeline = Pipeline(
     retriever=Retriever(embed_model, ds, embeddings["image_text_embeddings"]),
-    parser=Parser(POKEMON_CHAT_TEMPLATE),
     generator=Generator(gen_model, gen_processor),
 )
 
 
 @spaces.GPU
-def on_query(query_text, query_image, docs_top_k=3):
+def on_query(query_text, query_image):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     rag_pipeline.to(device)
     try:
-        response, doc_images = rag_pipeline.run(query_text, query_image, docs_top_k)
-        output_image_gallery = [
-            (im["image"], f"Score: {im['score']:.5f}") for im in doc_images
-        ]
-        return output_image_gallery, response
+        response, doc_images = rag_pipeline.cot_generation(query_text, query_image)
+        return doc_images, response
     finally:
         rag_pipeline.to("cpu")
 
@@ -89,14 +82,6 @@ with gr.Blocks(title="Nemotron VL RAG - Pokémon") as app:
                 label="Query Image (optional)",
                 type="pil",
                 height=200,
-            )
-
-            top_k_slider = gr.Slider(
-                minimum=1,
-                maximum=10,
-                step=1,
-                value=3,
-                label="Top k documents",
             )
 
             enter_btn = gr.Button("Enter", variant="primary", size="lg")
@@ -131,7 +116,7 @@ with gr.Blocks(title="Nemotron VL RAG - Pokémon") as app:
 
     enter_btn.click(
         fn=on_query,
-        inputs=[query_text, query_image, top_k_slider],
+        inputs=[query_text, query_image],
         outputs=[gallery_output, response],
     )
 
