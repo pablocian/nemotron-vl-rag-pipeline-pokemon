@@ -160,7 +160,7 @@ class Retriever:
     def _bm25_search(self, query: str) -> np.ndarray:
         query_tokens = query.lower().split()
         scores = self.bm25.get_scores(query_tokens)
-        return np.argsort(scores, descending=True)
+        return np.argsort(-scores)
 
     def _rrf_merge(self, r_semantic: torch.Tensor, r_lexical: np.ndarray | None = None) -> np.ndarray:
         k_constant = 60  # The value of 60 is a standard academic convention
@@ -171,7 +171,7 @@ class Retriever:
         for r in rankings:
             for rank, idx in enumerate(r):
                 rrf_scores[idx] += 1 / (k_constant + rank + 1)
-        return np.argsort(rrf_scores, descending=True)
+        return np.argsort(-rrf_scores)
 
     def retrieve(self, queries: list[str], query_image: Image.Image | None = None, hybrid: bool = True) -> np.ndarray:
         with torch.inference_mode():
