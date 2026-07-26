@@ -50,10 +50,10 @@ At runtime, the user can query the system with text, or text plus an image. The 
 **Reciprocal rank fusion (RRF).** Each search path produces its own ranking. RRF merges them without needing calibrated raw scores: a document scores highly if it appears near the top of one or more lists. For document $d$ over rankings $(r_1, \ldots, r_n)$:
 
 $$
-\operatorname{RRF}(d) = \sum_{i=1}^{n} \frac{1}{k + \operatorname{rank}_i(d)}
+RRF(d) = \sum_{i=1}^{n} \frac{1}{k + rank_i(d)}
 $$
 
-where $\operatorname{rank}_i(d)$ is the 1-based position of $d$ in ranking $i$, and $k$ is a smoothing constant (here $k = 60$, a common default). The fused scores are sorted descending to yield the final retrieval order.
+where $rank_i(d)$ is the 1-based position of $d$ in ranking $i$, and $k$ is a smoothing constant (here $k = 60$, a common default). The fused scores are sorted descending to yield the final retrieval order.
 
 ```mermaid
 flowchart TD
